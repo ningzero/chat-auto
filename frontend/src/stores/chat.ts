@@ -19,17 +19,6 @@ interface Message {
   }
 }
 
-interface CommandResult {
-  id?: number
-  command?: string
-  result?: any
-  user_id?: number
-  data?: {
-    command?: string
-    result?: any
-  }
-}
-
 interface ChatMessage {
   type: 'message' | 'command'
   _index: number
@@ -39,13 +28,15 @@ interface ChatMessage {
   author_id?: number
   author?: Message['author']
   created_at?: string
-  data?: CommandResult['data']
+  data?: {
+    command?: string
+    result?: any
+  }
 }
 
 export const useChatStore = defineStore('chat', () => {
   const room = ref('general')
   const messages = ref<Message[]>([])
-  const commandResults = ref<CommandResult[]>([])
   const connected = ref(false)
   const loadingHistory = ref(false)
   const currentUser = ref<{ id: number; username: string } | null>(null)
@@ -75,16 +66,21 @@ export const useChatStore = defineStore('chat', () => {
             error_message: data.error_message
           }
         } else {
-          // 新消息，直接添加
-          messages.value.push(data)
+          // 查找是否已存在相同 id 的消息（命令结果更新）
+          const foundIndex = messages.value.findIndex(m => m.id === data.id)
+          if (foundIndex !== -1) {
+            // 更新现有消息（命令结果更新）
+            messages.value[foundIndex] = {
+              ...messages.value[foundIndex],
+              command_result: data.command_result,
+              error_message: data.error_message
+            }
+          } else {
+            // 新消息，直接添加
+            messages.value.push(data)
+          }
         }
         scrollToBottom()
-      }
-    })
-
-    ws.on('command_result', (data: CommandResult & { type: string }) => {
-      if (data) {
-        commandResults.value.push(data)
       }
     })
 
@@ -132,15 +128,27 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   const executeCommand = (command: string) => {
+    // 立即添加消息到本地列表进行回显
+    const tempMessage: Message = {
+      id: -1,
+      content: command,
+      is_command: 1,
+      author_id: currentUser.value?.id,
+      room_id: room.value,
+      created_at: new Date().toISOString(),
+      author: currentUser.value ? {
+        id: currentUser.value.id,
+        username: currentUser.value.username
+      } : undefined
+    }
+    messages.value.push(tempMessage)
+    scrollToBottom()
+
     ws.send({
       type: 'message',
       content: command,
       room_id: room.value
     })
-  }
-
-  const clearResults = () => {
-    commandResults.value = []
   }
 
   const loadHistory = async () => {
@@ -201,24 +209,12 @@ export const useChatStore = defineStore('chat', () => {
       }
     }
 
-    // 添加实时命令结果（WebSocket）
-    for (const r of commandResults.value) {
-      if (r && (r.command || (r.data && r.data.command))) {
-        result.push({
-          type: 'command',
-          _index: messageIndex++,
-          data: r.data || { command: r.command, result: r.result }
-        })
-      }
-    }
-
     return result
   })
 
   return {
     room,
     messages,
-    commandResults,
     connected,
     loadingHistory,
     currentUser,
@@ -226,7 +222,6 @@ export const useChatStore = defineStore('chat', () => {
     disconnect,
     sendMessage,
     executeCommand,
-    clearResults,
     loadHistory,
     allMessages
   }

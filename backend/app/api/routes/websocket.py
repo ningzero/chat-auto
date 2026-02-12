@@ -119,13 +119,24 @@ async def websocket_endpoint(
                     db.add(message)
                     await db.commit()
                     await db.refresh(message)
+                    # 作为普通消息广播，前端会更新消息位置
                     await manager.broadcast({
-                        "type": "command_result",
+                        "type": "message",
                         "data": {
-                            "command": msg_content,
-                            "result": result_data,
-                        },
-                        "user_id": user.id
+                            "id": message.id,
+                            "content": message.content,
+                            "is_command": message.is_command,
+                            "author_id": message.author_id,
+                            "room_id": message.room_id,
+                            "command_result": message.command_result,
+                            "error_message": message.error_message,
+                            "created_at": message.created_at.isoformat(),
+                            "author": {
+                                "id": user.id,
+                                "username": user.username,
+                                "nickname": user.nickname,
+                            }
+                        }
                     }, room_id)
                     continue
 
@@ -149,13 +160,24 @@ async def websocket_endpoint(
                             db.add(message)
                             await db.commit()
                             await db.refresh(message)
+                            # 作为普通消息广播，前端会更新消息位置
                             await manager.broadcast({
-                                "type": "command_result",
+                                "type": "message",
                                 "data": {
-                                    "command": msg_content,
-                                    "result": result_data,
-                                },
-                                "user_id": user.id
+                                    "id": message.id,
+                                    "content": message.content,
+                                    "is_command": message.is_command,
+                                    "author_id": message.author_id,
+                                    "room_id": message.room_id,
+                                    "command_result": message.command_result,
+                                    "error_message": message.error_message,
+                                    "created_at": message.created_at.isoformat(),
+                                    "author": {
+                                        "id": user.id,
+                                        "username": user.username,
+                                        "nickname": user.nickname,
+                                    }
+                                }
                             }, room_id)
                         else:
                             error_data = f"Task {task_id} not found"
@@ -164,10 +186,21 @@ async def websocket_endpoint(
                             await db.commit()
                             await db.refresh(message)
                             await manager.broadcast({
-                                "type": "error",
+                                "type": "message",
                                 "data": {
-                                    "command": msg_content,
-                                    "message": error_data
+                                    "id": message.id,
+                                    "content": message.content,
+                                    "is_command": message.is_command,
+                                    "author_id": message.author_id,
+                                    "room_id": message.room_id,
+                                    "command_result": message.command_result,
+                                    "error_message": message.error_message,
+                                    "created_at": message.created_at.isoformat(),
+                                    "author": {
+                                        "id": user.id,
+                                        "username": user.username,
+                                        "nickname": user.nickname,
+                                    }
                                 }
                             }, room_id)
                     except ValueError:
@@ -177,10 +210,21 @@ async def websocket_endpoint(
                         await db.commit()
                         await db.refresh(message)
                         await manager.broadcast({
-                            "type": "error",
+                            "type": "message",
                             "data": {
-                                "command": msg_content,
-                                "message": error_data
+                                "id": message.id,
+                                "content": message.content,
+                                "is_command": message.is_command,
+                                "author_id": message.author_id,
+                                "room_id": message.room_id,
+                                "command_result": message.command_result,
+                                "error_message": message.error_message,
+                                "created_at": message.created_at.isoformat(),
+                                "author": {
+                                    "id": user.id,
+                                    "username": user.username,
+                                    "nickname": user.nickname,
+                                }
                             }
                         }, room_id)
                     continue
@@ -192,18 +236,36 @@ async def websocket_endpoint(
                     if script:
                         # 执行脚本
                         task = await script_service.execute_script(db, script, user.id)
+
+                        # 先广播 script_started 状态
+                        started_data = {
+                            "type": "script_started",
+                            "message": f"Script '{script.name}' started",
+                            "task_id": task.id,
+                            "script": script.name
+                        }
+                        message.command_result = json.dumps(started_data)
+                        db.add(message)
+                        await db.commit()
+                        await db.refresh(message)
+                        # 作为普通消息广播，前端会更新消息位置
                         await manager.broadcast({
-                            "type": "command_result",
+                            "type": "message",
                             "data": {
-                                "command": msg_content,
-                                "result": {
-                                    "type": "script_started",
-                                    "message": f"Script '{script.name}' started",
-                                    "task_id": task.id,
-                                    "script": script.name
+                                "id": message.id,
+                                "content": message.content,
+                                "is_command": message.is_command,
+                                "author_id": message.author_id,
+                                "room_id": message.room_id,
+                                "command_result": message.command_result,
+                                "error_message": message.error_message,
+                                "created_at": message.created_at.isoformat(),
+                                "author": {
+                                    "id": user.id,
+                                    "username": user.username,
+                                    "nickname": user.nickname,
                                 }
-                            },
-                            "user_id": user.id
+                            }
                         }, room_id)
 
                         # 执行完成后发送结果并保存
@@ -225,13 +287,24 @@ async def websocket_endpoint(
                             db.add(message)
                             await db.commit()
                             await db.refresh(message)
+                            # 作为普通消息广播，前端会更新消息位置
                             await manager.broadcast({
-                                "type": "command_result",
+                                "type": "message",
                                 "data": {
-                                    "command": msg_content,
-                                    "result": result_data,
-                                },
-                                "user_id": user.id
+                                    "id": message.id,
+                                    "content": message.content,
+                                    "is_command": message.is_command,
+                                    "author_id": message.author_id,
+                                    "room_id": message.room_id,
+                                    "command_result": message.command_result,
+                                    "error_message": message.error_message,
+                                    "created_at": message.created_at.isoformat(),
+                                    "author": {
+                                        "id": user.id,
+                                        "username": user.username,
+                                        "nickname": user.nickname,
+                                    }
+                                }
                             }, room_id)
                         continue
 
@@ -241,11 +314,23 @@ async def websocket_endpoint(
                 db.add(message)
                 await db.commit()
                 await db.refresh(message)
+                # 作为普通消息广播，前端会更新消息位置
                 await manager.broadcast({
-                    "type": "error",
+                    "type": "message",
                     "data": {
-                        "command": msg_content,
-                        "message": error_data
+                        "id": message.id,
+                        "content": message.content,
+                        "is_command": message.is_command,
+                        "author_id": message.author_id,
+                        "room_id": message.room_id,
+                        "command_result": message.command_result,
+                        "error_message": message.error_message,
+                        "created_at": message.created_at.isoformat(),
+                        "author": {
+                            "id": user.id,
+                            "username": user.username,
+                            "nickname": user.nickname,
+                        }
                     }
                 }, room_id)
                 continue
