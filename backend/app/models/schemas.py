@@ -38,6 +38,8 @@ class MessageResponse(BaseModel):
     is_command: int
     author_id: int
     room_id: str
+    command_result: Optional[str] = None
+    error_message: Optional[str] = None
     created_at: datetime
     author: Optional[UserResponse] = None
 

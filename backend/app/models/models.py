@@ -25,6 +25,8 @@ class Message(Base):
     is_command = Column(Integer, default=0)
     author_id = Column(Integer, ForeignKey("users.id"))
     room_id = Column(String(50), default="general")
+    command_result = Column(Text, nullable=True)  # 命令执行结果
+    error_message = Column(Text, nullable=True)   # 命令执行错误
     created_at = Column(DateTime, default=datetime.utcnow)
 
     author = relationship("User", back_populates="messages")

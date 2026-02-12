@@ -9,6 +9,8 @@ interface Message {
   is_command?: number
   author_id?: number
   room_id?: string
+  command_result?: string | null
+  error_message?: string | null
   created_at?: string
   author?: {
     id: number
@@ -135,10 +137,35 @@ export const useChatStore = defineStore('chat', () => {
           author: m.author,
           created_at: m.created_at
         })
+
+        // 如果有保存的命令结果，也添加
+        if (m.command_result || m.error_message) {
+          try {
+            const parsed = m.command_result ? JSON.parse(m.command_result) : null
+            result.push({
+              type: 'command',
+              _index: messageIndex++,
+              data: {
+                command: m.content,
+                result: m.error_message ? { error: m.error_message } : (parsed || {})
+              }
+            })
+          } catch {
+            // 如果解析失败，直接显示错误信息
+            result.push({
+              type: 'command',
+              _index: messageIndex++,
+              data: {
+                command: m.content,
+                result: { error: m.error_message || 'Unknown error' }
+              }
+            })
+          }
+        }
       }
     }
 
-    // 添加命令结果
+    // 添加实时命令结果（WebSocket）
     for (const r of commandResults.value) {
       if (r && (r.command || (r.data && r.data.command))) {
         result.push({

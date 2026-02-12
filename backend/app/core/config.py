@@ -13,8 +13,8 @@ class Settings(BaseSettings):
     # 脚本目录
     scripts_dir: Path = Path(__file__).resolve().parent.parent.parent.parent / "scripts"
 
-    # CORS
-    cors_origins: list[str] = ["http://localhost:5173", "http://localhost:3000"]
+    # CORS（允许任意来源）
+    cors_origins: list[str] = ["*"]
 
     # 安全配置
     max_script_runtime: int = 300  # 最大脚本执行时间(秒)

@@ -35,7 +35,7 @@ async def create_message(
     db: AsyncSession = Depends(get_db)
 ):
     """创建消息"""
-    # 简化：这里暂时用用户ID=1
+    # 使用固定用户 ID=1 (username="user")
     message = Message(
         content=msg.content,
         author_id=1,
