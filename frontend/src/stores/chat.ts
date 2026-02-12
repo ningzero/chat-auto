@@ -56,9 +56,28 @@ export const useChatStore = defineStore('chat', () => {
   const connect = () => {
     ws.connect()
 
-    ws.on('message', (data: Message & { type: string }) => {
+    ws.on('message', (eventData: { type: string; data: Message }) => {
+      const data = eventData.data
       if (data && data.content) {
-        messages.value.push(data)
+        // 检查是否已存在 id 为 -1 的临时消息（我们发送的消息）
+        const existingIndex = messages.value.findIndex(
+          m => m.id === -1 && m.content === data.content
+        )
+
+        if (existingIndex !== -1) {
+          // 更新临时消息为 confirmed 消息
+          messages.value[existingIndex] = {
+            ...messages.value[existingIndex],
+            id: data.id,
+            author_id: data.author_id,
+            created_at: data.created_at,
+            command_result: data.command_result,
+            error_message: data.error_message
+          }
+        } else {
+          // 新消息，直接添加
+          messages.value.push(data)
+        }
         scrollToBottom()
       }
     })
@@ -88,6 +107,23 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   const sendMessage = (content: string) => {
+    // 立即添加消息到本地列表进行回显（使用特殊的 ID 标记为临时消息）
+    const tempMessage: Message = {
+      id: -1,  // 使用 -1 标记临时消息
+      content,
+      is_command: content.startsWith('/') ? 1 : 0,
+      author_id: currentUser.value?.id,
+      room_id: room.value,
+      created_at: new Date().toISOString(),
+      author: currentUser.value ? {
+        id: currentUser.value.id,
+        username: currentUser.value.username
+      } : undefined
+    }
+    messages.value.push(tempMessage)
+    scrollToBottom()
+
+    // 通过 WebSocket 发送给服务器
     ws.send({
       type: 'message',
       content,

@@ -4,8 +4,37 @@ from typing import List
 from app.core.database import get_db
 from app.models.schemas import ScriptResponse, ScriptTaskResponse
 from app.services.script_service import script_service
+from pydantic import BaseModel
 
 router = APIRouter(prefix="/api/scripts", tags=["scripts"])
+
+
+class CommandInfo(BaseModel):
+    name: str
+    description: str
+
+
+# 内置命令定义
+BUILTIN_COMMANDS = [
+    CommandInfo(name="/list", description="List all available scripts"),
+    CommandInfo(name="/status", description="Check task status: /status <task_id>"),
+]
+
+
+@router.get("/commands", response_model=List[CommandInfo])
+async def list_commands(db: AsyncSession = Depends(get_db)):
+    """获取所有可用命令（内置命令 + 脚本命令）"""
+    commands = BUILTIN_COMMANDS.copy()
+    scripts = await script_service.get_all_scripts(db)
+    for script in scripts:
+        if script.command_pattern not in [cmd.name for cmd in commands]:
+            commands.append(
+                CommandInfo(
+                    name=script.command_pattern,
+                    description=script.description or f"Run {script.name} script"
+                )
+            )
+    return commands
 
 
 @router.get("", response_model=List[ScriptResponse])

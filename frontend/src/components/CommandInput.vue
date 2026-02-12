@@ -1,5 +1,27 @@
 <template>
   <div class="command-input-container">
+    <!-- 命令下拉按钮 -->
+    <button class="command-dropdown-btn" @click.stop="toggleDropdown" :class="{ active: showDropdown }">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="3" y1="6" x2="21" y2="6"></line>
+        <line x1="3" y1="12" x2="21" y2="12"></line>
+        <line x1="3" y1="18" x2="21" y2="18"></line>
+      </svg>
+    </button>
+
+    <!-- 命令下拉列表 -->
+    <div v-if="showDropdown" class="command-dropdown" ref="dropdownRef">
+      <div
+        v-for="cmd in availableCommands"
+        :key="cmd.name"
+        class="dropdown-item"
+        @click="selectCommand(cmd.name)"
+      >
+        <span class="dropdown-command">{{ cmd.name }}</span>
+        <span class="dropdown-desc">{{ cmd.description }}</span>
+      </div>
+    </div>
+
     <input
       v-model="inputValue"
       type="text"
@@ -31,7 +53,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { getCommands, type Command } from '@/api/messages'
 
 const emit = defineEmits<{
   send: [value: string]
@@ -44,25 +67,64 @@ const historyIndex = ref(-1)
 const showSuggestions = ref(false)
 const selectedIndex = ref(0)
 
-const availableCommands = [
-  { name: '/list', description: 'List all available scripts' },
-  { name: '/hello', description: 'Run hello script' },
-  { name: '/sysinfo', description: 'Show system information' },
-  { name: '/date', description: 'Show current date and time' },
-  { name: '/status', description: 'Check task status: /status <task_id>' },
-]
+const showDropdown = ref(false)
+const dropdownRef = ref<HTMLElement | null>(null)
+
+const availableCommands = ref<Command[]>([])
+const commandsLoading = ref(false)
 
 const filteredSuggestions = computed(() => {
   if (!inputValue.value.startsWith('/')) return []
   const prefix = inputValue.value.toLowerCase()
-  return availableCommands
+  return availableCommands.value
     .filter(c => c.name.toLowerCase().startsWith(prefix))
     .map(c => c.name)
 })
 
 function getCommandDescription(command: string) {
-  return availableCommands.find(c => c.name === command)?.description || ''
+  return availableCommands.value.find(c => c.name === command)?.description || ''
 }
+
+function toggleDropdown() {
+  showDropdown.value = !showDropdown.value
+  if (showDropdown.value) {
+    showSuggestions.value = false
+    if (availableCommands.value.length === 0 && !commandsLoading.value) {
+      loadCommands()
+    }
+  }
+}
+
+function selectCommand(command: string) {
+  inputValue.value = command
+  showDropdown.value = false
+}
+
+function handleClickOutside(event: MouseEvent) {
+  if (dropdownRef.value && !dropdownRef.value.contains(event.target as Node)) {
+    showDropdown.value = false
+  }
+}
+
+async function loadCommands() {
+  commandsLoading.value = true
+  try {
+    availableCommands.value = await getCommands()
+  } catch (error) {
+    console.error('Failed to load commands:', error)
+  } finally {
+    commandsLoading.value = false
+  }
+}
+
+onMounted(async () => {
+  await loadCommands()
+  document.addEventListener('click', handleClickOutside)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleClickOutside)
+})
 
 function handleSend() {
   const value = inputValue.value.trim()
@@ -124,6 +186,60 @@ function handleKeyNavigation(e: KeyboardEvent) {
   padding: 16px;
   background-color: var(--bg-secondary);
   border-top: 1px solid var(--border);
+}
+
+.command-dropdown-btn {
+  padding: 0 12px;
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.command-dropdown-btn:hover,
+.command-dropdown-btn.active {
+  background-color: var(--bg-primary);
+  border-color: var(--accent);
+}
+
+.command-dropdown {
+  position: absolute;
+  bottom: 100%;
+  left: 16px;
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+  margin-bottom: 8px;
+  z-index: 20;
+  min-width: 200px;
+}
+
+.dropdown-item {
+  display: flex;
+  flex-direction: column;
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: background-color 0.1s;
+  gap: 4px;
+}
+
+.dropdown-item:hover {
+  background-color: var(--bg-primary);
+}
+
+.dropdown-command {
+  font-family: 'Monaco', 'Menlo', monospace;
+  color: var(--success);
+  font-size: 14px;
+}
+
+.dropdown-desc {
+  color: var(--text-secondary);
+  font-size: 12px;
 }
 
 .command-input {

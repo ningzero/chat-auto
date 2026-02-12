@@ -16,6 +16,11 @@ export interface Message {
   }
 }
 
+export interface Command {
+  name: string
+  description: string
+}
+
 const api = axios.create({
   baseURL: API_BASE,
   headers: {
@@ -36,5 +41,10 @@ export async function createMessage(content: string, roomId: string = 'general',
     room_id: roomId,
     is_command: isCommand ? 1 : 0
   })
+  return response.data
+}
+
+export async function getCommands(): Promise<Command[]> {
+  const response = await api.get<Command[]>('/api/scripts/commands')
   return response.data
 }
