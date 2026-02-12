@@ -63,7 +63,7 @@
             <p class="hint">Try <code>/list</code> to get started</p>
           </div>
 
-          <template v-for="item in store.allMessages.filter(i => i && i.type)" :key="item._index || item.id || Date.now()">
+          <template v-for="item in store.allMessages.filter(i => i && i.type)" :key="item.key">
             <ChatMessageItem
               v-if="item.type === 'message' && item.content"
               :content="item.content"

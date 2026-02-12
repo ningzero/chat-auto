@@ -23,6 +23,7 @@
     </div>
 
     <input
+      ref="inputRef"
       v-model="inputValue"
       type="text"
       placeholder="Type a message or /command..."
@@ -53,7 +54,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { getCommands, type Command } from '@/api/messages'
 
 const emit = defineEmits<{
@@ -69,6 +70,7 @@ const selectedIndex = ref(0)
 
 const showDropdown = ref(false)
 const dropdownRef = ref<HTMLElement | null>(null)
+const inputRef = ref<HTMLInputElement | null>(null)
 
 const availableCommands = ref<Command[]>([])
 const commandsLoading = ref(false)
@@ -98,6 +100,10 @@ function toggleDropdown() {
 function selectCommand(command: string) {
   inputValue.value = command
   showDropdown.value = false
+  // 自动聚焦到输入框
+  nextTick(() => {
+    inputRef.value?.focus()
+  })
 }
 
 function handleClickOutside(event: MouseEvent) {
@@ -164,6 +170,10 @@ function handleDownArrow() {
 function selectSuggestion(command: string) {
   inputValue.value = command
   showSuggestions.value = false
+  // 自动聚焦到输入框
+  nextTick(() => {
+    inputRef.value?.focus()
+  })
 }
 
 // Keyboard navigation for suggestions
@@ -174,6 +184,10 @@ function handleKeyNavigation(e: KeyboardEvent) {
       inputValue.value = filteredSuggestions.value[selectedIndex.value]
     }
     showSuggestions.value = false
+    // 保持输入框焦点
+    nextTick(() => {
+      inputRef.value?.focus()
+    })
   }
 }
 </script>

@@ -21,7 +21,7 @@ interface Message {
 
 interface ChatMessage {
   type: 'message' | 'command'
-  _index: number
+  key: string  // 稳定的 key，用于 Vue 的 v-for
   id?: number
   content?: string
   is_command?: number
@@ -40,7 +40,6 @@ export const useChatStore = defineStore('chat', () => {
   const connected = ref(false)
   const loadingHistory = ref(false)
   const currentUser = ref<{ id: number; username: string } | null>(null)
-  let messageIndex = 0
 
   const ws = useWebSocket(room)
 
@@ -171,9 +170,10 @@ export const useChatStore = defineStore('chat', () => {
     // 添加普通消息
     for (const m of messages.value) {
       if (m && m.content) {
+        const messageId = m.id || m.content  // 使用 id 或 content 作为唯一标识
         result.push({
           type: 'message',
-          _index: messageIndex++,
+          key: `msg-${messageId}`,
           id: m.id,
           content: m.content,
           is_command: m.is_command,
@@ -184,11 +184,12 @@ export const useChatStore = defineStore('chat', () => {
 
         // 如果有保存的命令结果，也添加
         if (m.command_result || m.error_message) {
+          const resultId = `${messageId}-result`
           try {
             const parsed = m.command_result ? JSON.parse(m.command_result) : null
             result.push({
               type: 'command',
-              _index: messageIndex++,
+              key: `cmd-${resultId}`,
               data: {
                 command: m.content,
                 result: m.error_message ? { error: m.error_message } : (parsed || {})
@@ -198,7 +199,7 @@ export const useChatStore = defineStore('chat', () => {
             // 如果解析失败，直接显示错误信息
             result.push({
               type: 'command',
-              _index: messageIndex++,
+              key: `cmd-${resultId}`,
               data: {
                 command: m.content,
                 result: { error: m.error_message || 'Unknown error' }
