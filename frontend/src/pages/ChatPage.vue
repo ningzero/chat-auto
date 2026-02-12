@@ -1,9 +1,18 @@
 <template>
   <div class="chat-page">
+    <div v-if="sidebarOpen" class="sidebar-overlay" @click="sidebarOpen = false"></div>
+
     <header class="chat-header">
       <div class="header-content">
+        <button class="menu-toggle" @click="toggleSidebar" aria-label="Toggle menu">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+          </svg>
+        </button>
         <div class="logo">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
           </svg>
           <span>ChatAuto</span>
@@ -16,7 +25,7 @@
     </header>
 
     <div class="chat-body">
-      <div class="sidebar">
+      <div :class="['sidebar', { open: sidebarOpen }]">
         <div class="section-title">Quick Commands</div>
         <div class="command-list">
           <button
@@ -86,6 +95,7 @@ import CommandInput from '@/components/CommandInput.vue'
 
 const store = useChatStore()
 const messagesContainer = ref<HTMLElement | null>(null)
+const sidebarOpen = ref(false)
 
 const quickCommands = [
   { name: 'List Scripts', command: '/list', icon: '📋' },
@@ -116,6 +126,11 @@ async function handleSend(content: string) {
 
 function executeQuickCommand(command: string) {
   handleSend(command)
+  sidebarOpen.value = false
+}
+
+function toggleSidebar() {
+  sidebarOpen.value = !sidebarOpen.value
 }
 
 function scrollToBottom() {
@@ -142,6 +157,22 @@ function scrollToBottom() {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.menu-toggle {
+  display: none;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  padding: 8px;
+  margin-right: 8px;
+  border-radius: 8px;
+  transition: background-color 0.2s;
+}
+
+.menu-toggle:hover {
+  background-color: var(--bg-tertiary);
 }
 
 .logo {
@@ -324,6 +355,81 @@ function scrollToBottom() {
 @keyframes spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+.sidebar-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 100;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .menu-toggle {
+    display: block;
+  }
+
+  .chat-header {
+    padding: 12px 16px;
+  }
+
+  .logo {
+    font-size: 16px;
+  }
+
+  .logo svg {
+    width: 24px;
+    height: 24px;
+  }
+
+  .connection-status {
+    font-size: 11px;
+    padding: 4px 8px;
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: -280px;
+    width: 280px;
+    height: 100vh;
+    z-index: 101;
+    transition: left 0.3s ease;
+    border-right: none;
+  }
+
+  .sidebar.open {
+    left: 0;
+  }
+
+  .messages-container {
+    padding: 16px 12px;
+  }
+
+  .empty-state svg {
+    width: 40px;
+    height: 40px;
+  }
+
+  .empty-state p {
+    font-size: 13px;
+  }
+
+  .command-btn {
+    padding: 12px 14px;
+  }
+
+  .cmd-text {
+    font-size: 15px;
+  }
+
+  .cmd-shortcut {
+    font-size: 11px;
   }
 }
 </style>
