@@ -41,7 +41,12 @@
 
       <div class="chat-area">
         <div class="messages-container" ref="messagesContainer">
-          <div v-if="store.allMessages.length === 0" class="empty-state">
+          <div v-if="store.loadingHistory" class="loading-state">
+            <div class="spinner"></div>
+            <p>Loading chat history...</p>
+          </div>
+
+          <div v-else-if="store.allMessages.length === 0" class="empty-state">
             <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
             </svg>
@@ -49,9 +54,9 @@
             <p class="hint">Try <code>/list</code> to get started</p>
           </div>
 
-          <template v-for="item in store.allMessages" :key="item.id || Math.random()">
+          <template v-for="item in store.allMessages.filter(i => i && i.type)" :key="item._index || item.id || Date.now()">
             <ChatMessageItem
-              v-if="item.type === 'message'"
+              v-if="item.type === 'message' && item.content"
               :content="item.content"
               :author="item.author"
               :created-at="item.created_at"
@@ -60,8 +65,8 @@
             />
 
             <CommandResultItem
-              v-else-if="item.type === 'command'"
-              :data="item"
+              v-else-if="item.type === 'command' && item.data"
+              :data="item.data"
             />
           </template>
         </div>
@@ -295,5 +300,30 @@ function scrollToBottom() {
   border-radius: 4px;
   color: var(--accent);
   font-family: 'Monaco', 'Menlo', monospace;
+}
+
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-secondary);
+  gap: 16px;
+}
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--bg-tertiary);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style>

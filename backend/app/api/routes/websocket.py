@@ -1,11 +1,12 @@
+import asyncio
 import json
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from datetime import datetime
-from ..core.database import get_db
-from ..models.models import User, Message, ScriptTask
-from ..services.script_service import script_service
+from app.core.database import get_db
+from app.models.models import User, Message, ScriptTask
+from app.services.script_service import script_service
 
 router = APIRouter()
 
@@ -52,7 +53,6 @@ async def websocket_endpoint(
     user = result.scalar_one_or_none()
 
     if not user:
-        from ..models.schemas import UserResponse
         user = User(
             username=username,
             nickname=username,
@@ -186,7 +186,7 @@ async def websocket_endpoint(
 
                         # 执行完成后发送结果
                         while task and task.status in ("pending", "running"):
-                            await websocket.client_connection._async_sleep(0.5)
+                            await asyncio.sleep(0.5)
                             task = await script_service.get_task(db, task.id)
 
                         if task:

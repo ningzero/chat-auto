@@ -1,12 +1,13 @@
 import asyncio
 import subprocess
+import os
 from pathlib import Path
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from ..models.models import Script, ScriptTask
-from ..models.schemas import ScriptTaskResponse
-from ..core.config import settings
+from app.models.models import Script, ScriptTask
+from app.models.schemas import ScriptTaskResponse
+from app.core.config import settings
 
 
 class ScriptService:
@@ -75,65 +76,106 @@ class ScriptService:
         await db.commit()
         await db.refresh(task)
 
-        # 异步执行脚本
-        asyncio.create_task(self._run_script(task, script, db))
+        # 异步执行脚本（只传 task id，避免 session 问题）
+        asyncio.create_task(self._run_script(task.id, script.id))
 
         return ScriptTaskResponse.model_validate(task)
 
     async def _run_script(
         self,
-        task: ScriptTask,
-        script: Script,
-        db: AsyncSession
+        task_id: int,
+        script_id: int
     ):
         """实际运行脚本的内部方法"""
         from datetime import datetime
+        from app.core.database import async_session
+
+        # 获取 script 信息
+        async with async_session() as db:
+            script_result = await db.execute(
+                select(Script).where(Script.id == script_id)
+            )
+            script = script_result.scalar_one_or_none()
+            if not script:
+                return
 
         # 更新状态为运行中
-        task.status = "running"
-        await db.commit()
+        async with async_session() as db:
+            result = await db.execute(
+                select(ScriptTask).where(ScriptTask.id == task_id)
+            )
+            task = result.scalar_one_or_none()
+            if task:
+                task.status = "running"
+                await db.commit()
 
+        # 解析脚本路径
         script_path = Path(script.path)
         if not script_path.is_absolute():
             script_path = self.scripts_dir / script_path
+        script_path = script_path.resolve()
 
-        try:
-            # 执行脚本
-            process = await asyncio.create_subprocess_exec(
-                str(script_path),
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                cwd=self.scripts_dir
-            )
+        exit_code = None
+        output = None
+        error = None
+        final_status = "failed"
 
-            # 设置超时
+        # 检查文件是否存在
+        if not script_path.exists():
+            error = f"Script file not found: {script_path}"
+        elif not script_path.is_file():
+            error = f"Not a file: {script_path}"
+        elif not os.access(script_path, os.X_OK):
+            error = f"Script not executable: {script_path}"
+        else:
             try:
-                stdout, stderr = await asyncio.wait_for(
-                    process.communicate(),
-                    timeout=settings.max_script_runtime
+                # 执行脚本
+                process = await asyncio.create_subprocess_exec(
+                    str(script_path),
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                    cwd=self.scripts_dir
                 )
 
-                task.exit_code = process.returncode
-                task.output = stdout.decode('utf-8')
-                task.error = stderr.decode('utf-8') if stderr else None
+                # 设置超时
+                try:
+                    stdout, stderr = await asyncio.wait_for(
+                        process.communicate(),
+                        timeout=settings.max_script_runtime
+                    )
 
-                if process.returncode == 0:
-                    task.status = "completed"
-                else:
-                    task.status = "failed"
+                    exit_code = process.returncode
+                    output = stdout.decode('utf-8')
+                    error = stderr.decode('utf-8') if stderr else None
 
-            except asyncio.TimeoutError:
-                process.kill()
-                task.status = "failed"
-                task.error = f"Script execution timed out after {settings.max_script_runtime} seconds"
+                    if process.returncode == 0:
+                        final_status = "completed"
+                    else:
+                        final_status = "failed"
 
-        except Exception as e:
-            task.status = "failed"
-            task.error = str(e)
+                except asyncio.TimeoutError:
+                    process.kill()
+                    error = f"Script execution timed out after {settings.max_script_runtime} seconds"
 
-        finally:
-            task.completed_at = datetime.utcnow()
-            await db.commit()
+                except Exception as e:
+                    error = str(e)
+
+            except Exception as e:
+                error = str(e)
+
+        # 更新最终状态
+        async with async_session() as db:
+            result = await db.execute(
+                select(ScriptTask).where(ScriptTask.id == task_id)
+            )
+            task = result.scalar_one_or_none()
+            if task:
+                task.status = final_status
+                task.exit_code = exit_code
+                task.output = output
+                task.error = error
+                task.completed_at = datetime.utcnow()
+                await db.commit()
 
     async def get_task(
         self,

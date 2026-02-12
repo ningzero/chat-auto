@@ -5,13 +5,13 @@ from pathlib import Path
 class Settings(BaseSettings):
     # 服务配置
     host: str = "0.0.0.0"
-    port: int = 8000
+    port: int = 8001
 
     # 数据库配置
     database_url: str = "sqlite+aiosqlite:///./chat_auto.db"
 
     # 脚本目录
-    scripts_dir: Path = Path(__file__).parent.parent.parent / "scripts"
+    scripts_dir: Path = Path(__file__).resolve().parent.parent.parent.parent / "scripts"
 
     # CORS
     cors_origins: list[str] = ["http://localhost:5173", "http://localhost:3000"]

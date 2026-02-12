@@ -1,12 +1,13 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { useWebSocket } from '@/api/websocket'
+import { getMessages } from '@/api/messages'
 
 interface Message {
   id?: number
   content: string
-  is_command: number
-  author_id: number
+  is_command?: number
+  author_id?: number
   room_id?: string
   created_at?: string
   author?: {
@@ -18,9 +19,25 @@ interface Message {
 
 interface CommandResult {
   id?: number
-  command: string
-  result: any
+  command?: string
+  result?: any
   user_id?: number
+  data?: {
+    command?: string
+    result?: any
+  }
+}
+
+interface ChatMessage {
+  type: 'message' | 'command'
+  _index: number
+  id?: number
+  content?: string
+  is_command?: number
+  author_id?: number
+  author?: Message['author']
+  created_at?: string
+  data?: CommandResult['data']
 }
 
 export const useChatStore = defineStore('chat', () => {
@@ -28,20 +45,26 @@ export const useChatStore = defineStore('chat', () => {
   const messages = ref<Message[]>([])
   const commandResults = ref<CommandResult[]>([])
   const connected = ref(false)
+  const loadingHistory = ref(false)
   const currentUser = ref<{ id: number; username: string } | null>(null)
+  let messageIndex = 0
 
   const ws = useWebSocket(room)
 
   const connect = () => {
     ws.connect()
 
-    ws.on('message', (data: Message) => {
-      messages.value.push(data)
-      scrollToBottom()
+    ws.on('message', (data: Message & { type: string }) => {
+      if (data && data.content) {
+        messages.value.push(data)
+        scrollToBottom()
+      }
     })
 
-    ws.on('command_result', (data: CommandResult) => {
-      commandResults.value.push(data)
+    ws.on('command_result', (data: CommandResult & { type: string }) => {
+      if (data) {
+        commandResults.value.push(data)
+      }
     })
 
     ws.on('error', (data: any) => {
@@ -50,6 +73,7 @@ export const useChatStore = defineStore('chat', () => {
 
     ws.on('open', () => {
       connected.value = true
+      loadHistory()
     })
 
     ws.on('close', () => {
@@ -81,18 +105,51 @@ export const useChatStore = defineStore('chat', () => {
     commandResults.value = []
   }
 
-  const allMessages = computed(() => {
-    // 合并普通消息和命令结果
-    const combined = [
-      ...messages.value.map(m => ({ ...m, type: 'message' })),
-      ...commandResults.value.map(r => ({ ...r, type: 'command' }))
-    ]
-    // 按时间排序
-    return combined.sort((a, b) => {
-      const timeA = a.created_at ? new Date(a.created_at).getTime() : 0
-      const timeB = b.created_at ? new Date(b.created_at).getTime() : 0
-      return timeA - timeB
-    })
+  const loadHistory = async () => {
+    if (loadingHistory.value) return
+    loadingHistory.value = true
+    try {
+      const history = await getMessages(room.value, 100)
+      messages.value = history
+      scrollToBottom()
+    } catch (error) {
+      console.error('Failed to load message history:', error)
+    } finally {
+      loadingHistory.value = false
+    }
+  }
+
+  const allMessages = computed((): ChatMessage[] => {
+    const result: ChatMessage[] = []
+
+    // 添加普通消息
+    for (const m of messages.value) {
+      if (m && m.content) {
+        result.push({
+          type: 'message',
+          _index: messageIndex++,
+          id: m.id,
+          content: m.content,
+          is_command: m.is_command,
+          author_id: m.author_id,
+          author: m.author,
+          created_at: m.created_at
+        })
+      }
+    }
+
+    // 添加命令结果
+    for (const r of commandResults.value) {
+      if (r && (r.command || (r.data && r.data.command))) {
+        result.push({
+          type: 'command',
+          _index: messageIndex++,
+          data: r.data || { command: r.command, result: r.result }
+        })
+      }
+    }
+
+    return result
   })
 
   return {
@@ -100,12 +157,14 @@ export const useChatStore = defineStore('chat', () => {
     messages,
     commandResults,
     connected,
+    loadingHistory,
     currentUser,
     connect,
     disconnect,
     sendMessage,
     executeCommand,
     clearResults,
+    loadHistory,
     allMessages
   }
 })

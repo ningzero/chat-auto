@@ -2,9 +2,11 @@ from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
-from .core.database import init_db
-from .core.config import settings
-from .api.routes import scripts, messages, websocket
+from app.core.database import init_db
+from app.core.config import settings
+from app.api.routes.scripts import router as scripts_router
+from app.api.routes.messages import router as messages_router
+from app.api.routes.websocket import router as websocket_router
 
 
 @asynccontextmanager
@@ -13,8 +15,8 @@ async def lifespan(app: FastAPI):
     await init_db()
 
     # 注册一些示例脚本
-    from .core.database import async_session
-    from .services.script_service import script_service
+    from app.core.database import async_session
+    from app.services.script_service import script_service
 
     async with async_session() as db:
         # 检查是否已有脚本
@@ -63,9 +65,9 @@ app.add_middleware(
 )
 
 # 路由
-app.include_router(scripts.router)
-app.include_router(messages.router)
-app.include_router(websocket.router)
+app.include_router(scripts_router)
+app.include_router(messages_router)
+app.include_router(websocket_router)
 
 
 @app.get("/")

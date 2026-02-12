@@ -1,11 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from typing import List
 from datetime import datetime
-from ..core.database import get_db
-from ..models.models import User, Message
-from ..models.schemas import MessageCreate, MessageResponse
+from app.core.database import get_db
+from app.models.models import User, Message
+from app.models.schemas import MessageCreate, MessageResponse
 
 router = APIRouter(prefix="/api/messages", tags=["messages"])
 
@@ -19,6 +20,7 @@ async def get_messages(
     """获取聊天消息"""
     result = await db.execute(
         select(Message)
+        .options(selectinload(Message.author))
         .where(Message.room_id == room_id)
         .order_by(Message.created_at.desc())
         .limit(limit)
